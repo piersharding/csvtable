@@ -195,8 +195,8 @@ def main():
                 if len(row[cvsn]) > 0 and re.match('^[\s\d\.]+$', row[cvsn]):
                     row[cvsn] = int(float(row[cvsn]))
                 
+        # load CSV data into table
         vals = [row[h] for h in r.header]
-        #print vals
         cur.execute("INSERT INTO temptable VALUES(" + ", ".join(isrt) + ")", vals)
 
     con.commit()
@@ -221,7 +221,12 @@ def main():
         flds = options.list
     sql = 'SELECT ' +flds + ' FROM temptable ' + where + groupby + orderby
     logging.info("SQL is: " + str(sql))
-    cur.execute(sql)
+    try:
+        cur.execute(sql)
+    except sqlite3.OperationalError as (msg):
+        logging.info("SQL Error: " + str(msg))
+        sys.exit(-1)
+
     col_names = [cn[0] for cn in cur.description]
     rows = cur.fetchall()
 
@@ -231,6 +236,7 @@ def main():
     for row in rows:
         print ",".join(['"' + str(out(i)) + '"' for i in row])
 
+    # tidy up sqlite db
     os.unlink(DB_FILE)
     sys.exit(0)
 
