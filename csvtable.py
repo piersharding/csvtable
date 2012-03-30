@@ -212,7 +212,7 @@ def main():
     cols = dict(zip(r.header, [coltypes(c, conversions) for c in r.header]))
 
     # build up the row schema from the header
-    hdrs = [h + ' ' + cols[h] for h in r.header]
+    hdrs = ['"' + h + '" ' + cols[h] for h in r.header]
     isrt = ", ".join(['?' for h in r.header])
 
     # build a temporary sqlite DB for queries
@@ -255,7 +255,7 @@ def main():
         orderby = " ORDER BY " + options.sort
         
     # what fields to select including summaries
-    flds = ", ".join(r.header)
+    flds = ", ".join(['"' + h + '"' for h in r.header])
     if options.list:
         flds = options.list
     sql = 'SELECT ' +flds + ' FROM temptable ' + where + groupby + orderby
