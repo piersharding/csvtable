@@ -120,6 +120,41 @@ def output_csv_file(fh, data):
     writer = csv.writer(fh, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL, lineterminator="\n")
     writer.writerows(data)
 
+# calculate the TABLE column types
+def coltypes(c, conversions):
+    t = 'TEXT'
+    if c in conversions:
+        if conversions[c] == 'int':
+            t = 'INTEGER'
+        elif conversions[c] == 'float':
+            t = 'REAL'
+        elif conversions[c] == 'date':
+            t = 'INTEGER'
+    return t
+
+# determine the date conversion required
+def date_conversion(val):
+    if re.match('^\d{4}\-\d\d\-\d\d$', val):
+        # 2012-12-31
+        val = time.mktime(datetime.strptime(val, '%Y-%m-%d').timetuple())
+    elif re.match('^\d\d?\/\d\d\/\d{4}$', val):
+        # 31/12/2012
+        val = time.mktime(datetime.strptime(val, '%d/%m/%Y').timetuple())
+    elif re.match('^\d\d?\.\d\d\.\d{4}$', val):
+        # 31.12.2012
+        val = time.mktime(datetime.strptime(val, '%d.%m.%Y').timetuple())
+    elif re.match('^\d{4}\d{2}\d{2}$', val):
+        # 20121231
+        val = time.mktime(datetime.strptime(val, '%Y%m%d').timetuple())
+    elif re.match('^\w+\, \d+ \w+ \d{4} \d\d\:\d\d:\d\d ', val):
+        # Thu, 23 Apr 2009 13:32:15 +1200
+        import rfc822
+        import datetime as dt
+        # [year, month, day, hour, min, sec]
+        yyyy, mm, dd, hh, mins, ss = rfc822.parsedate(val)[:-3]
+        val = time.mktime(dt.datetime(yyyy, mm, dd, hh, mins, ss).timetuple())
+    return val
+
 
 # main of application
 def main():
@@ -160,9 +195,8 @@ def main():
     conversions = {}
     if options.convert:
         conversions = [c.strip().split(":")[0] for c in options.convert.split(",")]
-        conversions = dict(zip(conversions, [c.strip().split(":")[1] for c in options.convert.split(",")]))
+        conversions = dict(zip(conversions, [c.strip().split(":")[1].lower() for c in options.convert.split(",")]))
     logging.info("conversions are: " + str(conversions))
-
 
     # set the encoding to stop errors on the input/putput streams
     reload(sys)
@@ -174,9 +208,12 @@ def main():
         logging.info('CSV file is empty')
         sys.exit(1)
 
+    # what should the table column types be
+    cols = dict(zip(r.header, [coltypes(c, conversions) for c in r.header]))
+
     # build up the row schema from the header
-    hdrs = [h + ' TEXT' for h in r.header]
-    isrt = ['?' for h in r.header]
+    hdrs = [h + ' ' + cols[h] for h in r.header]
+    isrt = ", ".join(['?' for h in r.header])
 
     # build a temporary sqlite DB for queries
     con = sqlite3.connect(DB_FILE)
@@ -189,7 +226,7 @@ def main():
         # process conversions
         for cvsn, action in conversions.items():
             if action == 'date':
-                row[cvsn] = time.mktime(datetime.strptime(row[cvsn], '%Y-%m-%d').timetuple())
+                row[cvsn] = date_conversion(row[cvsn])
             elif action == 'float':
                 if len(row[cvsn]) > 0 and re.match('^[\s\d\.]+$', row[cvsn]):
                     row[cvsn] = float(row[cvsn])
@@ -199,7 +236,7 @@ def main():
                 
         # load CSV data into table
         vals = [row[h] for h in r.header]
-        cur.execute("INSERT INTO temptable VALUES(" + ", ".join(isrt) + ")", vals)
+        cur.execute("INSERT INTO temptable VALUES(" + isrt + ")", vals)
 
     con.commit()
 
