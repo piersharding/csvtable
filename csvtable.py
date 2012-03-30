@@ -107,6 +107,7 @@ class csvfile(object):
             items = zip(fields, row)
             item = {}
             for (name, value) in items:
+                # data that gets inserted in SQLite must be utf-8 encoded
                 item[name] = value.strip().decode('utf-8', 'ignore')
             csv_file.append(item)
             #print(item)
@@ -114,16 +115,13 @@ class csvfile(object):
         return csvdata(fields, csv_file)
 
 
-# try and strip weird unicode stuff before output
-def out(val):
-    if type(val) == float or type(val) == int:
-        return str(val)
-    try:
-        return val.decode('utf-8', 'ignore')
-    except UnicodeEncodeError:
-        return ""
+# CSV file output handler
+def output_csv_file(fh, data):
+    writer = csv.writer(fh, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL, lineterminator="\n")
+    writer.writerows(data)
 
 
+# main of application
 def main():
 
     # setup logging
@@ -165,6 +163,10 @@ def main():
         conversions = dict(zip(conversions, [c.strip().split(":")[1] for c in options.convert.split(",")]))
     logging.info("conversions are: " + str(conversions))
 
+
+    # set the encoding to stop errors on the input/putput streams
+    reload(sys)
+    sys.setdefaultencoding("utf-8")
 
     # import the file
     r = csvfile.read(fh)
@@ -227,14 +229,14 @@ def main():
         logging.info("SQL Error: " + str(msg))
         sys.exit(-1)
 
+    # get the header and data from the SQL SELECT
     col_names = [cn[0] for cn in cur.description]
     rows = cur.fetchall()
 
     # output as CSV again
     logging.info("column names out: " + str(col_names))
-    print ",".join(col_names)
-    for row in rows:
-        print ",".join(['"' + str(out(i)) + '"' for i in row])
+    rows.insert(0, col_names)
+    output_csv_file(sys.stdout, rows)
 
     # tidy up sqlite db
     os.unlink(DB_FILE)
