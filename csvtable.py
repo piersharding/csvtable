@@ -146,13 +146,23 @@ def date_conversion(val):
     elif re.match('^\d{4}\d{2}\d{2}$', val):
         # 20121231
         val = time.mktime(datetime.strptime(val, '%Y%m%d').timetuple())
-    elif re.match('^\w+\, \d+ \w+ \d{4} \d\d\:\d\d:\d\d ', val):
+    elif re.match('^(\w+\,\s+)?\d+ \w+ \d{4}\s+\d\d?\:\d\d(:\d\d)?', val) or re.match('^\w+,?\s+?\d+ \d{2-4}\s+\d\d?\:\d\d(:\d\d)?', val):
+        # Jan 24 2003 15:26:20 +0000
+        # Mon, 20 Dec 04 08:37:31 GMT
+        # Sat, 13 May 2006 06:15 +0000
+        # Mon, 01 Jul 2002 18:38:25
+        # Mon, 26 Sep 2005 7:35:00 -0800
         # Thu, 23 Apr 2009 13:32:15 +1200
+        # 26 Aug 2009 02:07:34 +0400
         import rfc822
         import datetime as dt
         # [year, month, day, hour, min, sec]
         yyyy, mm, dd, hh, mins, ss = rfc822.parsedate(val)[:-3]
         val = time.mktime(dt.datetime(yyyy, mm, dd, hh, mins, ss).timetuple())
+        try:
+            val = float(str(val))
+        except ValueError:
+            pass
     return val
 
 
