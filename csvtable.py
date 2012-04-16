@@ -18,6 +18,10 @@ process csv file:
 
 Options:
 
+--head
+Shows what the column names are and the first 10 rows.
+
+
 --list
 essentially what you can put in the SELECT part of an SQL statement eg: --list='*, sum(widgetvalue)'
 
@@ -173,6 +177,8 @@ def main():
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s [%(name)s] %(levelname)s: %(message)s')
 
     parser = OptionParser()
+    parser.add_option("-d", "--head", dest="head", default=False, action="store_true",
+                          help="list column headings and a sample rows", metavar="HEAD")
     parser.add_option("-f", "--file", dest="csv_file", default=None, type="string",
                           help="A CSV file for input", metavar="CSV_FILE")
     parser.add_option("-c", "--convert", dest="convert", default=None, type="string",
@@ -200,6 +206,14 @@ def main():
 
     logging.info("CSV file to process: " + str(options.csv_file))
     logging.info("options are: " + str(options))
+
+    # do we just list a few rows
+    if options.head:
+        for i, line in enumerate(fh):
+            if i > 10:
+                break
+            sys.stdout.write(line)
+        sys.exit(0)
 
     # what conversions do we do
     conversions = {}
