@@ -38,6 +38,9 @@ essentially what you can put in the WHERE part of an SQL statement eg: --where="
 --sort
 essentially what you can put in the ORDER BY part of an SQL statement eg: --sort='system,date'
 
+--delimiter
+change the delimiter from ',' eg: --delimiter='|'
+
 --group
 essentially what you can put in the GROUP BY part of an SQL statement eg: --sort='system,date'
 This is used automatically for the ORDER BY as well.  It doesn't make a great deal of sense unless you use sum(), and count() etc. in the --list option too.
@@ -67,6 +70,44 @@ from datetime import datetime
 import time
 import csv
 import sqlite3
+import nltk
+import nltk.chunk
+import itertools
+
+
+#import nltk
+#from nltk.collocations import *
+#bigram_measures = nltk.collocations.BigramAssocMeasures()
+#trigram_measures = nltk.collocations.TrigramAssocMeasures()
+#
+## change this to read in your data
+#finder = BigramCollocationFinder.from_words(nltk.corpus.genesis.words('english-web.txt'))
+#
+## only bigrams that appear 3+ times
+#finder.apply_freq_filter(3) 
+#
+## return the 10 n-grams with the highest PMI
+#finder.nbest(bigram_measures.pmi, 10)
+
+#import nltk.chunk
+ 
+#def conll_tag_chunks(chunk_sents):
+#    tag_sents = [nltk.chunk.tree2conlltags(tree) for tree in chunk_sents]
+#    return [[(t, c) for (w, t, c) in chunk_tags] for chunk_tags in tag_sents]
+#
+##import nltk.corpus, nltk.tag
+#print nltk.corpus.genesis.words('english-web.txt')
+#
+##train_chunks = conll_tag_chunks(nltk.corpus.genesis.words('english-web.txt'))
+#train_chunks = nltk.corpus.brown.tagged_sents()
+##train_chunks = conll_tag_chunks('/home/piers/nltk_data/corpora/genesis/english-web.txt')
+#u_chunker = nltk.tag.UnigramTagger(train_chunks)
+#ub_chunker = nltk.tag.BigramTagger(train_chunks, backoff=u_chunker)
+##ubt_chunker = nltk.tag.TrigramTagger(train_chunks, backoff=ub_chunker)
+##ut_chunker = nltk.tag.TrigramTagger(train_chunks, backoff=u_chunker)
+##utb_chunker = nltk.tag.BigramTagger(train_chunks, backoff=ut_chunker)
+
+
 
 DB_FILE = './table_tmp.db'
 
@@ -120,8 +161,8 @@ class csvfile(object):
 
 
 # CSV file output handler
-def output_csv_file(fh, data):
-    writer = csv.writer(fh, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL, lineterminator="\n")
+def output_csv_file(fh, data, delimiter):
+    writer = csv.writer(fh, delimiter=delimiter, quotechar='"', quoting=csv.QUOTE_MINIMAL, lineterminator="\n")
     writer.writerows(data)
 
 # calculate the TABLE column types
@@ -169,6 +210,82 @@ def date_conversion(val):
             pass
     return val
 
+ 
+#class TagChunker(nltk.chunk.ChunkParserI):
+#    def __init__(self, chunk_tagger):
+#        self._chunk_tagger = chunk_tagger
+# 
+#    def parse(self, tokens):
+#        # split words and part of speech tags
+#        (words, tags) = zip(*tokens)
+#        # get IOB chunk tags
+#        chunks = self._chunk_tagger.tag(tags)
+#        # join words with chunk tags
+#        wtc = itertools.izip(words, chunks)
+#        # w = word, t = part-of-speech tag, c = chunk tag
+#        lines = [' '.join([w, t, c]) for (w, (t, c)) in wtc if c]
+#        # create tree from conll formatted chunk lines
+#        logging.info("lines for chunker: " + str(lines))
+#        try:
+#            return nltk.chunk.conllstr2tree('\n'.join(lines))
+#        except ValueError:
+#            return ''
+
+# use nltk to find the nouns in text
+def nltk_nounphrase(val):
+    #val = re.sub('[\[\]\|\!\$\%\&\(\)\-\_\=\+\\\/]+', ' ', val)
+    #tokens = nltk.word_tokenize(val)
+    ##tagged = nltk.pos_tag(tokens)
+    ## sentence should be a list of words
+    grammar = "NP: {<DT>?<JJ.*>*<NN.*>+}"
+    nouns = []
+    cp = nltk.RegexpParser(grammar)
+    #tagged = ub_chunker.tag(tokens)
+    val = re.sub('[\[\]\|\!\$\%\&\(\)\-\_\=\+\\\/]+', ' ', val)
+    tokens = nltk.word_tokenize(val)
+    tagged = nltk.pos_tag(tokens)
+    #logging.info("elements from tagger: " + str(tagged))
+    tree = cp.parse(tagged)
+    for subtree in tree.subtrees():
+        #logging.info("node type: " + str(subtree.node))
+        if subtree.node == 'NP' or subtree.node == 'CHUNK':
+            words = [ w for (w, t) in subtree.leaves() ]
+            nouns.append(" ".join(words))
+    #tagchunker = TagChunker(ub_chunker)
+    #tagged = tagger.tag(tokens)
+    #tagged = ub_chunker.tag(tokens)
+    #tree = False
+    #try:
+    #    tree = tagchunker.parse(tokens)
+    #except ValueError:
+    #    pass
+    # for each noun phrase sub tree in the parse tree
+    #if tree:
+    #    for subtree in tree.subtrees(filter=lambda t: t.node == 'NP'):
+    #        # print the noun phrase as a list of part-of-speech tagged words
+    #        nouns.append(subtree.leaves())
+    #for tag in tagged:
+    #    item, typ = tag
+    #    if typ == 'NNP' or typ == 'NN':
+    #        nouns.append(item)
+    #logging.info('nouns: ' + repr(nouns))
+    return '|'.join(nouns)
+
+
+
+# use nltk to find the nouns in text
+def nltk_nouns(val):
+    val = re.sub('[\[\]\|\!\$\%\&\(\)\-\_\=\+\\\/]+', ' ', val)
+    tokens = nltk.word_tokenize(val)
+    tagged = nltk.pos_tag(tokens)
+    nouns = []
+    for tag in tagged:
+        item, typ = tag
+        if typ == 'NNP' or typ == 'NN':
+            nouns.append(item)
+    #logging.info('nouns: ' + repr(nouns))
+    return '|'.join(nouns)
+
 
 # main of application
 def main():
@@ -191,6 +308,8 @@ def main():
                           help="What columns to group by", metavar="GROUP")
     parser.add_option("-l", "--list", dest="list", default=None, type="string",
                           help="alternate field list", metavar="LIST")
+    parser.add_option("-b", "--delimiter", dest="delimiter", default=',', type="string",
+                          help="alternate field delimiter", metavar="DELIMITER")
     (options, args) = parser.parse_args()
 
     # load the csv file
@@ -257,8 +376,13 @@ def main():
             elif action == 'int':
                 if len(row[cvsn]) > 0 and re.match('^[\s\d\.]+$', row[cvsn]):
                     row[cvsn] = int(float(row[cvsn]))
+            elif action == 'noun':
+                row[cvsn] = nltk_nouns(row[cvsn])
+            elif action == 'nounphrase':
+                row[cvsn] = nltk_nounphrase(row[cvsn])
                 
         # load CSV data into table
+        #logging.info("the row: " + str(row))
         vals = [row[h] for h in r.header]
         cur.execute("INSERT INTO temptable VALUES(" + isrt + ")", vals)
 
@@ -280,6 +404,12 @@ def main():
         
     # what fields to select including summaries
     flds = ", ".join(['"' + h + '"' for h in r.header])
+    #cur.execute('PRAGMA table_info(temptable);')
+    #newcols = cur.fetchall()
+    #newcols = [f for (i, f, t, p1, p2, p3) in newcols]
+    #newcols = dict(zip(newcols, newcols))
+    #logging.info("temtable cols: " + str(newcols))
+
     if options.list:
         flds = options.list
     sql = 'SELECT ' +flds + ' FROM temptable ' + where + groupby + orderby
@@ -297,7 +427,7 @@ def main():
     # output as CSV again
     logging.info("column names out: " + str(col_names))
     rows.insert(0, col_names)
-    output_csv_file(sys.stdout, rows)
+    output_csv_file(sys.stdout, rows, options.delimiter)
 
     # tidy up sqlite db
     os.unlink(DB_FILE)
