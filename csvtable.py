@@ -145,7 +145,7 @@ class csvfile(object):
         csvReader = csv.reader(lines, delimiter=',', quotechar='"')
     
         # get header row
-        fields = csvReader.next() 
+        fields = [ i.strip() for i in csvReader.next() ]
     
         # process each csv record into a hash
         for row in csvReader:
